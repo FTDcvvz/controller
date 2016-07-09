@@ -10,8 +10,9 @@
 #include "ruletables.h"
 #include <arpa/inet.h>
 
-#define SERVERPORT 3333
-#define CONNPORT 6666
+#define SERVERPORT 3333  //server
+#define CONNPORT 6666     //client
+#define MY_MOD_ADDR "127.0.0.1"
 
 #define SET_POLICY 0
 #define APPEND 1
@@ -19,12 +20,36 @@
 #define BUFFER_SIZE 10
 #define LENGTH 4
 
+#define GET_MES(handle_type)  \
+            int recvSize = sizeof(struct handle_type); \
+            char * buffer = (char*)malloc(recvSize); \
+	    if(!buffer){ \
+	      fprintf(stderr, "malloc error : %s\n",strerror(errno));\
+            } \
+            struct handle_type *handle = (struct handle_type *)malloc(recvSize); \
+            int pos=0; \
+            int len=0; \
+            while(pos<recvSize){ \
+                len = recv(connfd,buffer+pos,BUFFER_SIZE,0); \
+                if(len<=0){ \
+                    perror("recv error! \n"); \
+                    break; \
+                } \
+                pos+=len; \
+            } \
+            if(!memcpy(handle,buffer,recvSize)){ \
+	      fprintf(stderr, "memcpy error : %s\n",strerror(errno));\
+            } \
+            free(buffer); \
+            buffer = NULL 
+
 struct handle_c{
     int command;
     ruletable table;
 };
 
-void do_init(struct handle_c * handle, int command, struct list_head p,
+static void 
+do_init(struct handle_c * handle, int command, struct list_head p,
 	const char* saddr,const char* daddr,const char* smsk,const char* dmsk,
 	uint16_t spts0,uint16_t spts1,uint16_t dpts0,uint16_t dpts1,
 	int priority,const char* actionType,
@@ -47,7 +72,8 @@ void do_init(struct handle_c * handle, int command, struct list_head p,
 	strcpy(handle->table.property.tablename,tablename);
 }
 
-void init_handle(struct handle_c * handle)
+static void 
+init_handle(struct handle_c * handle)
 {	
 	struct list_head p;
 	p.prev = p.next = NULL;
@@ -65,17 +91,8 @@ void init_handle(struct handle_c * handle)
 
 }
 
-void send_to_my_mod(struct handle_c* handle)
-{
-	
-}
-
-void do_server()
-{
-
-}
-
-int main ()
+static void 
+send_message_to_my_mod()
 {
 	int    sockfd, n;
     struct sockaddr_in    servaddr;
@@ -88,7 +105,7 @@ int main ()
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(CONNPORT);
-    if( inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr) <= 0){
+    if( inet_pton(AF_INET, MY_MOD_ADDR, &servaddr.sin_addr) <= 0){
     printf("inet_pton error\n");
     exit(0);
     }
@@ -125,7 +142,57 @@ int main ()
     free(handle);
     buffer = NULL;
     handle = NULL;
+}
 
+static void 
+print_message(struct handle_c * h)
+{
+	printf("info from my module: %d %s %s %s \n",h->command,h->table.actionType,h->table.property.tablename,
+        h->table.actionDesc);
+}
 
+static void 
+do_server()
+{
+	int    listenfd,connfd;
+    struct sockaddr_in  servaddr;
+
+    if( (listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ){
+        printf("create socket error: %s(errno: %d)\n",strerror(errno),errno);
+        exit(0);
+    }
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(SERVERPORT);
+    if( bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1){
+        printf("bind socket error: %s(errno: %d)\n",strerror(errno),errno);
+        exit(0);
+    }
+    if( listen(listenfd, 10) == -1){
+        printf("listen socket error: %s(errno: %d)\n",strerror(errno),errno);
+        exit(0);
+    }
+
+    printf("======waiting for my module's request ======\n");
+    while(1){
+        if((connfd = accept(listenfd, (struct sockaddr*)NULL, NULL)) == -1){
+            printf("accept socket error: %s(errno: %d)",strerror(errno),errno);
+            continue;
+        }
+	printf("messages coming from my module.\n");
+	GET_MES(handle_c);
+	print_message(handle);
+	free(handle);
+    close(connfd);
+    }
+    close(listenfd);
+}
+
+int 
+main ()
+{
+	send_message_to_my_mod();
     do_server();
 }
+
