@@ -18,30 +18,6 @@
 #define APPEND 1
 
 #define BUFFER_SIZE 10
-#define LENGTH 4
-
-#define GET_MES(handle_type)  \
-            int recvSize = sizeof(struct handle_type); \
-            char * buffer = (char*)malloc(recvSize); \
-	    if(!buffer){ \
-	      fprintf(stderr, "malloc error : %s\n",strerror(errno));\
-            } \
-            struct handle_type *handle = (struct handle_type *)malloc(recvSize); \
-            int pos=0; \
-            int len=0; \
-            while(pos<recvSize){ \
-                len = recv(connfd,buffer+pos,BUFFER_SIZE,0); \
-                if(len<=0){ \
-                    perror("recv error! \n"); \
-                    break; \
-                } \
-                pos+=len; \
-            } \
-            if(!memcpy(handle,buffer,recvSize)){ \
-	      fprintf(stderr, "memcpy error : %s\n",strerror(errno));\
-            } \
-            free(buffer); \
-            buffer = NULL 
 
 struct handle_c{
     int command;
@@ -52,7 +28,7 @@ static void
 do_init(struct handle_c * handle, int command, struct list_head p,
 	const char* saddr,const char* daddr,const char* smsk,const char* dmsk,
 	uint16_t spts0,uint16_t spts1,uint16_t dpts0,uint16_t dpts1,
-	int priority,const char* actionType,
+	int priority,const char * proto,const char* actionType,
 	const char* actionDesc,const char* tablename)
 {
 	
@@ -67,9 +43,47 @@ do_init(struct handle_c * handle, int command, struct list_head p,
 	handle->table.head.dpts[0] = dpts0;
 	handle->table.head.dpts[1] = dpts1;
 	handle->table.priority = priority;
-	strcpy(handle->table.actionType,actionType);
-	strcpy(handle->table.actionDesc,actionDesc);
-	strcpy(handle->table.property.tablename,tablename);
+	if(proto == NULL)
+		handle->table.head.proto = PROTO_NONE;
+	else if(strcmp(proto,"TCP") == 0)
+		handle->table.head.proto = TCP;
+	else if(strcmp(proto,"UDP") == 0)
+		handle->table.head.proto = UDP;
+	else if(strcmp(proto,"ICMP") == 0)
+		handle->table.head.proto = ICMP;
+	else if(strcmp(proto,"ARP") == 0)
+		handle->table.head.proto = ARP;
+	
+	
+	    if(strcmp(actionType,"INPUT") == 0)
+		handle->table.actionType = INPUT;
+	    else if(strcmp(actionType,"OUTPUT") == 0)
+		handle->table.actionType = OUTPUT;
+	    else if(strcmp(actionType,"FORWARD") == 0)
+		handle->table.actionType = FORWARD;
+	    else if(strcmp(actionType,"PREROUTING") == 0)
+		handle->table.actionType = PREROUTING;
+	    else if(strcmp(actionType,"POSTROUTING") == 0)
+		handle->table.actionType = POSTROUTING;
+	    else handle->table.actionType = TYPE_NONE;
+
+	    if(strcmp(actionDesc,"ACCEPT") == 0)
+		handle->table.actionDesc = ACCEPT;
+	    else if(strcmp(actionDesc,"DROP") == 0)
+		handle->table.actionDesc = DROP;
+	    else if(strcmp(actionDesc,"QUEUE") == 0)
+		handle->table.actionDesc = QUEUE;
+	    else if(strcmp(actionDesc,"RETURN") == 0)
+		handle->table.actionDesc = RETURN;
+	    else handle->table.actionDesc = DESC_NONE;
+
+	    if(strcmp(tablename,"filter") == 0)
+		handle->table.property.tablename = filter;
+	    else if(strcmp(tablename,"nat") == 0)
+		handle->table.property.tablename = nat;
+	    else if(strcmp(tablename,"mangle") == 0)
+		handle->table.property.tablename = mangle;
+	    else handle->table.property.tablename = NAME_NONE;
 }
 
 static void 
@@ -78,23 +92,23 @@ init_handle(struct handle_c * handle)
 	struct list_head p;
 	p.prev = p.next = NULL;
 //	do_init(handle,SET_POLICY,p,"0.0.0.0","0.0.0.0","0.0.0.0",
-//		"0.0.0.0",0,0,0,0,0,"FORWARD","ACCEPT","filter");
+//		"0.0.0.0",0,0,0,0,0,NULL,"FORWARD","ACCEPT","filter");
 
 //	do_init(handle,APPEND,p,"192.168.0.1","0.0.0.0","255.255.255.255",
-//		"0.0.0.0",0,0,0,0,0,"INPUT","ACCEPT","filter");
+//		"0.0.0.0",0,137,138,80,0,"UDP","INPUT","ACCEPT","filter");
 
 //	do_init(handle,APPEND,p,"0.0.0.0","0.0.0.0","0.0.0.0",
-//		"0.0.0.0",0,0,137,138,0,"INPUT","ACCEPT","filter");
+//		"0.0.0.0",0,0,137,138,0,"TCP","INPUT","ACCEPT","filter");
 
 	do_init(handle,APPEND,p,"192.168.0.1","10.10.10.10","255.255.255.255",
-		"255.255.255.255",0,0,0,0,0,"INPUT","ACCEPT","filter");
+		"255.255.255.255",0,0,0,0,0,NULL,"INPUT","ACCEPT","filter");
 
 }
 
 static void 
 send_message_to_my_mod()
 {
-	int    sockfd, n;
+	int    sockfd;
     struct sockaddr_in    servaddr;
 	
 	if( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -147,7 +161,7 @@ send_message_to_my_mod()
 static void 
 print_message(struct handle_c * h)
 {
-	printf("info from my module: %d %s %s %s \n",h->command,h->table.actionType,h->table.property.tablename,
+	printf("info from my module: %d %u %u %u \n",h->command,h->table.actionType,h->table.property.tablename,
         h->table.actionDesc);
 }
 
@@ -181,7 +195,27 @@ do_server()
             continue;
         }
 	printf("messages coming from my module.\n");
-	GET_MES(handle_c);
+            int recvSize = sizeof(struct handle_c); 
+            char * buffer = (char*)malloc(recvSize); 
+	    if(!buffer){ 
+	      fprintf(stderr, "malloc error : %s\n",strerror(errno));
+            } 
+            struct handle_c *handle = (struct handle_c *)malloc(recvSize); 
+            int pos=0; 
+            int len=0; 
+            while(pos<recvSize){ 
+                len = recv(connfd,buffer+pos,BUFFER_SIZE,0); 
+                if(len<=0){ 
+                    perror("recv error! \n"); 
+                    break; 
+                } 
+                pos+=len; 
+            } 
+            if(!memcpy(handle,buffer,recvSize)){ 
+	      fprintf(stderr, "memcpy error : %s\n",strerror(errno));
+            } 
+            free(buffer); 
+            buffer = NULL ;
 	print_message(handle);
 	free(handle);
     close(connfd);
