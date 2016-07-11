@@ -96,11 +96,11 @@ init_handle(struct handle_c * handle)
 {	
 	struct list_head p;
 	p.prev = p.next = NULL;
-	do_init(handle,SET_POLICY,p,"0.0.0.0","0.0.0.0","0.0.0.0",
-		"0.0.0.0",0,0,0,0,0,NULL,"FORWARD","ACCEPT","filter");
+//	do_init(handle,SET_POLICY,p,"0.0.0.0","0.0.0.0","0.0.0.0",
+//		"0.0.0.0",0,0,0,0,0,NULL,"FORWARD","ACCEPT","filter");
 
-//	do_init(handle,APPEND,p,"192.168.0.1","0.0.0.0","255.255.255.255",
-//		"0.0.0.0",0,137,138,80,0,"udp","INPUT","ACCEPT","filter");
+	do_init(handle,APPEND,p,"192.168.0.1","0.0.0.0","255.255.255.255",
+		"0.0.0.0",0,137,138,80,0,"udp","INPUT","ACCEPT","filter");
 
 //	do_init(handle,APPEND,p,"0.0.0.0","0.0.0.0","0.0.0.0",
 //		"0.0.0.0",0,0,137,0,0,"tcp","INPUT","ACCEPT","filter");
