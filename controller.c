@@ -20,17 +20,19 @@ typedef enum _command_list
 {	SET_POLICY ,
 	APPEND	,
 	INSERT ,
+	ALTER ,
 	DELETE ,
 	CLEAN  ,
 	ALLIN		
 }command_list;
 struct handle_c{
+    int index;
     command_list command;
     ruletable table;
 }; 
 
 static void 
-do_init(struct handle_c * handle, int command, struct list_head p,
+do_init(struct handle_c * handle, command_list command,int index, struct list_head p,
 	const char* saddr,const char* daddr,const char* smsk,const char* dmsk,
 	uint16_t spts0,uint16_t spts1,uint16_t dpts0,uint16_t dpts1,
 	int priority,const char * proto,const char* actionType,
@@ -38,6 +40,7 @@ do_init(struct handle_c * handle, int command, struct list_head p,
 {
 	
 	handle->command = command;
+	handle->index = index;
 	handle->table.list = p;
 	handle->table.head.s_addr =  inet_addr(saddr);
 	handle->table.head.d_addr =  inet_addr(daddr);
@@ -96,17 +99,23 @@ init_handle(struct handle_c * handle)
 {	
 	struct list_head p;
 	p.prev = p.next = NULL;
-	do_init(handle,SET_POLICY,p,"0.0.0.0","0.0.0.0","0.0.0.0",
-		"0.0.0.0",0,0,0,0,0,NULL,"FORWARD","ACCEPT","filter");
+//	do_init(handle,SET_POLICY,0,p,"0.0.0.0","0.0.0.0","0.0.0.0",
+//		"0.0.0.0",0,0,0,0,0,NULL,"FORWARD","DROP","filter");
 
-//	do_init(handle,APPEND,p,"192.168.0.1","0.0.0.0","255.255.255.255",
+//	do_init(handle,APPEND,0,p,"192.168.0.1","10.10.10.10","255.255.255.255",
 //		"0.0.0.0",0,137,138,80,0,"udp","INPUT","ACCEPT","filter");
 
-//	do_init(handle,APPEND,p,"0.0.0.0","0.0.0.0","0.0.0.0",
+//	do_init(handle,APPEND,0,p,"0.0.0.0","0.0.0.0","0.0.0.0",
 //		"0.0.0.0",0,0,137,0,0,"tcp","INPUT","ACCEPT","filter");
 
-//	do_init(handle,APPEND,p,"192.168.0.1","10.10.10.10","255.255.255.255",
-//		"255.255.255.255",0,0,0,0,0,NULL,"INPUT","ACCEPT","filter");
+//	do_init(handle,APPEND,0,p,"192.168.0.1","15.15.15.15","255.255.255.255",
+//		"255.255.255.255",123,128,300,301,0,"tcp","INPUT","ACCEPT","filter");
+
+//	do_init(handle,CLEAN,0,p,"0.0.0.0","0.0.0.0","0.0.0.0",
+//		"0.0.0.0",0,0,0,0,0,NULL,NULL,NULL,"filter");
+
+	do_init(handle,DELETE,2,p,"0.0.0.0","0.0.0.0","0.0.0.0",
+		"0.0.0.0",0,0,0,0,0,NULL,"INPUT",NULL,"filter");
 
 }
 
